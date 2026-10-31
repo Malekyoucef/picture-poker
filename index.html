@@ -1,0 +1,48 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+        <meta name="viewport" content="width=device-width, initial-scale=1.0">
+            <title>Picture Poker</title>
+                <link rel="stylesheet" href="style.css">
+                    <!-- Load PeerJS for Peer-to-Peer Multiplayer -->
+                        <script src="https://unpkg.com/peerjs@1.5.2/dist/peerjs.min.js"></script>
+                        </head>
+                        <body>
+                            <!-- SETUP SCREEN -->
+                                <div id="setup-screen">
+                                        <h1>🖼️ Picture Poker</h1>
+                                                <div class="panel">
+                                                            <h3>Player 1 (Host)</h3>
+                                                                        <button id="host-btn">Create a Game</button>
+                                                                                    <p>Your Game ID: <b id="host-id">...</b></p>
+                                                                                            </div>
+                                                                                                    
+                                                                                                            <div class="panel">
+                                                                                                                        <h3>Player 2 (Join)</h3>
+                                                                                                                                    <input type="text" id="join-id" placeholder="Enter Host's Game ID">
+                                                                                                                                                <button id="join-btn">Join Game</button>
+                                                                                                                                                        </div>
+                                                                                                                                                                <p id="status-msg"></p>
+                                                                                                                                                                    </div>
+
+                                                                                                                                                                        <!-- GAME SCREEN -->
+                                                                                                                                                                            <div id="game-screen" style="display: none;">
+                                                                                                                                                                                    <h2>The Pot (Pictures Bet)</h2>
+                                                                                                                                                                                            <p id="rule-tracker">Current rule: You must bet <b>1</b> picture(s).</p>
+                                                                                                                                                                                                    
+                                                                                                                                                                                                            <div id="pot-area">
+                                                                                                                                                                                                                        <!-- Uploaded pictures will appear here -->
+                                                                                                                                                                                                                                </div>
+
+                                                                                                                                                                                                                                        <div id="player-area">
+                                                                                                                                                                                                                                                    <h3>Your Turn</h3>
+                                                                                                                                                                                                                                                                <p>Upload pictures to bet. (Hold CTRL/CMD to select multiple)</p>
+                                                                                                                                                                                                                                                                            <input type="file" id="pic-upload" accept="image/*" multiple>
+                                                                                                                                                                                                                                                                                        <button id="bet-btn">Bet Picture(s)</button>
+                                                                                                                                                                                                                                                                                                </div>
+                                                                                                                                                                                                                                                                                                    </div>
+
+                                                                                                                                                                                                                                                                                                        <script src="script.js"></script>
+                                                                                                                                                                                                                                                                                                        </body>
+                                                                                                                                                                                                                                                                                                        </html>
