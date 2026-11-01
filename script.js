@@ -2,7 +2,9 @@ let peer, conn;
 let myRole = null; 
 let myName = "Player", oppName = "Opponent";
 
-// Added Ready Status to Game State
+// NEW: Tracks if the very first hand has started to prevent double-dealing
+let gameStarted = false; 
+
 let gameState = { phase: 0, turn: 'none', hostBetPhase: 0, joinerBetPhase: 0, hostActed: false, joinerActed: false, winner: null, actionMsg: "Game starting...", hostReadyNext: false, joinerReadyNext: false };
 
 let myHand = [], communityCards = [], secretPot = [];
@@ -10,21 +12,27 @@ let hostKnownJoinerHand = [];
 
 const suits = ['♥', '♦', '♠', '♣'];
 const values = ['2', '3', '4', '5', '6', '7', '8', '9', '10', 'J', 'Q', 'K', 'A'];
-const ROOM_PREFIX = "picture-poker-v5-";
+
+// Changed prefix to v6 so it connects to a fresh server channel
+const ROOM_PREFIX = "picture-poker-v6-";
 
 // --- 1. SETUP ---
 document.getElementById('host-btn').addEventListener('click', () => {
     myName = document.getElementById('player-name').value || "Host";
     const code = document.getElementById('room-code').value.toUpperCase().trim();
     if (!code) return alert("Enter Room Code!");
+    
     myRole = 'host';
     peer = new Peer(ROOM_PREFIX + code);
     peer.on('open', () => document.getElementById('status-msg').innerHTML = `Table Created! Friend joins with code <b>${code}</b>...`);
+    
     peer.on('connection', (connection) => {
         conn = connection;
-        setupUI();
-        conn.on('data', handleNetworkData);
-        setTimeout(startNewHand, 1000); 
+        // FIX: Wait for the connection pipeline to be 100% open before sending data!
+        conn.on('open', () => {
+            setupUI();
+            conn.on('data', handleNetworkData);
+        });
     });
 });
 
@@ -32,12 +40,16 @@ document.getElementById('join-btn').addEventListener('click', () => {
     myName = document.getElementById('player-name').value || "Player 2";
     const code = document.getElementById('room-code').value.toUpperCase().trim();
     if (!code) return alert("Enter Room Code!");
+    
     myRole = 'joiner';
     document.getElementById('status-msg').innerText = "Connecting...";
     peer = new Peer();
     peer.on('open', () => {
         conn = peer.connect(ROOM_PREFIX + code);
-        conn.on('open', () => { setupUI(); conn.on('data', handleNetworkData); });
+        conn.on('open', () => { 
+            setupUI(); 
+            conn.on('data', handleNetworkData); 
+        });
     });
 });
 
@@ -45,6 +57,8 @@ function setupUI() {
     document.getElementById('setup-screen').style.display = 'none';
     document.getElementById('game-screen').style.display = 'block';
     document.getElementById('my-name-display').innerText = myName;
+    
+    // When UI is set up, send our name to the other player (The "Hello" Handshake)
     conn.send({ type: 'INFO', name: myName });
 }
 
@@ -66,8 +80,8 @@ function startNewHand() {
     communityCards = [deck.pop(), deck.pop(), deck.pop(), deck.pop(), deck.pop()];
     secretPot = [];
     
-    // Reset Readiness
     gameState = { phase: 0, turn: 'host', hostBetPhase: 0, joinerBetPhase: 0, hostActed: false, joinerActed: false, winner: null, actionMsg: "New hand dealt. Host goes first.", hostReadyNext: false, joinerReadyNext: false };
+    
     conn.send({ type: 'DEAL', hand: hostKnownJoinerHand, community: communityCards });
     syncState();
 }
@@ -87,7 +101,6 @@ function checkPhaseAdvance() {
         gameState.turn = 'host'; 
         gameState.actionMsg = `Phase advanced. Host's turn.`;
 
-        // AUTOMATIC SHOWDOWN JUDGING
         if (gameState.phase > 3) {
             gameState.phase = 4;
             gameState.turn = 'none';
@@ -179,6 +192,12 @@ function handleNetworkData(data) {
     if (data.type === 'INFO') {
         oppName = data.name;
         document.getElementById('opp-name-display').innerText = oppName;
+        
+        // FIX: Start the first hand EXACTLY when Player 2 says "Hello" (sends INFO)
+        if (myRole === 'host' && !gameStarted) {
+            gameStarted = true;
+            startNewHand();
+        }
     }
     else if (data.type === 'DEAL') {
         myHand = data.hand; communityCards = data.community; secretPot = [];
@@ -195,7 +214,6 @@ function handleNetworkData(data) {
             gameState.actionMsg = `${oppName} Folded. Host wins!`;
             syncState();
         } else if (data.action === 'READY_NEXT') {
-            // NEW: Joiner is ready for next hand
             gameState.joinerReadyNext = true;
             if (gameState.hostReadyNext && gameState.joinerReadyNext) startNewHand();
             else syncState();
@@ -208,8 +226,6 @@ function handleNetworkData(data) {
 }
 
 // --- 5. PLAYER CONTROLS ---
-
-// NEW: Mutual Agreement to deal next hand
 document.getElementById('btn-next-hand').addEventListener('click', () => {
     if (myRole === 'host') {
         gameState.hostReadyNext = true;
@@ -323,7 +339,6 @@ function renderGame() {
     } else {
         document.getElementById('my-action-text').innerText = "Hand Over.";
         
-        // Winner Reveal Logic
         if (gameState.winner === myRole) {
             btnClaimWin.style.display = 'block';
             btnClaimWin.innerText = "🏆 I Won! (Reveal Pot)";
@@ -332,13 +347,12 @@ function renderGame() {
             btnClaimWin.innerText = "🤝 Tie! (Reveal Pot)";
         }
 
-        // NEW: Dual Ready Logic
         nextHandControls.style.display = 'block';
         let amIReady = myRole === 'host' ? gameState.hostReadyNext : gameState.joinerReadyNext;
         
         if (amIReady) {
             btnNextHand.style.display = 'none';
-            readyStatus.style.display = 'block'; // Shows "Waiting for opponent to be ready..."
+            readyStatus.style.display = 'block';
         } else {
             btnNextHand.style.display = 'block';
             readyStatus.style.display = 'none';
