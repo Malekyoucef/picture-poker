@@ -2,14 +2,15 @@ let peer, conn;
 let myRole = null; 
 let myName = "Player", oppName = "Opponent";
 
-let gameState = { phase: 0, turn: 'none', hostBetPhase: 0, joinerBetPhase: 0, hostActed: false, joinerActed: false, winner: null, actionMsg: "Game starting..." };
+// Added Ready Status to Game State
+let gameState = { phase: 0, turn: 'none', hostBetPhase: 0, joinerBetPhase: 0, hostActed: false, joinerActed: false, winner: null, actionMsg: "Game starting...", hostReadyNext: false, joinerReadyNext: false };
 
 let myHand = [], communityCards = [], secretPot = [];
-let hostKnownJoinerHand = []; // The Host tracks both hands secretly to evaluate at the end
+let hostKnownJoinerHand = []; 
 
 const suits = ['♥', '♦', '♠', '♣'];
 const values = ['2', '3', '4', '5', '6', '7', '8', '9', '10', 'J', 'Q', 'K', 'A'];
-const ROOM_PREFIX = "picture-poker-v4-";
+const ROOM_PREFIX = "picture-poker-v5-";
 
 // --- 1. SETUP ---
 document.getElementById('host-btn').addEventListener('click', () => {
@@ -65,7 +66,8 @@ function startNewHand() {
     communityCards = [deck.pop(), deck.pop(), deck.pop(), deck.pop(), deck.pop()];
     secretPot = [];
     
-    gameState = { phase: 0, turn: 'host', hostBetPhase: 0, joinerBetPhase: 0, hostActed: false, joinerActed: false, winner: null, actionMsg: "New hand dealt. Host goes first." };
+    // Reset Readiness
+    gameState = { phase: 0, turn: 'host', hostBetPhase: 0, joinerBetPhase: 0, hostActed: false, joinerActed: false, winner: null, actionMsg: "New hand dealt. Host goes first.", hostReadyNext: false, joinerReadyNext: false };
     conn.send({ type: 'DEAL', hand: hostKnownJoinerHand, community: communityCards });
     syncState();
 }
@@ -89,25 +91,19 @@ function checkPhaseAdvance() {
         if (gameState.phase > 3) {
             gameState.phase = 4;
             gameState.turn = 'none';
-            
-            // Reveal both hands
             gameState.revealedHostHand = myHand;
             gameState.revealedJoinerHand = hostKnownJoinerHand;
 
-            // Evaluate who mathematically won
             const hostScore = evaluateHand([...myHand, ...communityCards]);
             const joinerScore = evaluateHand([...hostKnownJoinerHand, ...communityCards]);
-            
             const cmp = compareScores(hostScore.score, joinerScore.score);
+            
             if (cmp > 0) {
-                gameState.winner = 'host';
-                gameState.actionMsg = `Showdown: Host wins with a ${hostScore.name}!`;
+                gameState.winner = 'host'; gameState.actionMsg = `Showdown: Host wins with a ${hostScore.name}!`;
             } else if (cmp < 0) {
-                gameState.winner = 'joiner';
-                gameState.actionMsg = `Showdown: ${oppName} wins with a ${joinerScore.name}!`;
+                gameState.winner = 'joiner'; gameState.actionMsg = `Showdown: ${oppName} wins with a ${joinerScore.name}!`;
             } else {
-                gameState.winner = 'tie';
-                gameState.actionMsg = `Showdown: It's a Tie! Both have ${hostScore.name}!`;
+                gameState.winner = 'tie'; gameState.actionMsg = `Showdown: It's a Tie! Both have ${hostScore.name}!`;
             }
         }
     } else {
@@ -120,9 +116,8 @@ function checkPhaseAdvance() {
 function evaluateHand(cards) {
     const valMap = {'2':2,'3':3,'4':4,'5':5,'6':6,'7':7,'8':8,'9':9,'10':10,'J':11,'Q':12,'K':13,'A':14};
     let bestScore = [-1], bestName = "";
-    
-    // Gets all 21 combinations of 5 cards from your 7 available cards
     const combos = getCombinations(cards, 5);
+    
     for(let combo of combos) {
         let counts = {}, suits = {};
         combo.forEach(c => {
@@ -134,12 +129,11 @@ function evaluateHand(cards) {
         let flush = Object.keys(suits).length === 1;
         let sortedVals = Object.keys(counts).map(Number).sort((a,b) => a-b);
         let isStraight = sortedVals.length === 5 && sortedVals[4] - sortedVals[0] === 4;
-        
-        if(sortedVals.length === 5 && sortedVals.join(',') === '2,3,4,5,14') isStraight = true; // A-2-3-4-5 rule
+        if(sortedVals.length === 5 && sortedVals.join(',') === '2,3,4,5,14') isStraight = true; 
         
         let freqs = [];
         for(let v in counts) freqs.push([counts[v], Number(v)]);
-        freqs.sort((a,b) => b[0] !== a[0] ? b[0] - a[0] : b[1] - a[1]); // Sort by frequency, then highest card
+        freqs.sort((a,b) => b[0] !== a[0] ? b[0] - a[0] : b[1] - a[1]); 
         
         let rank = 0, name = "High Card";
         if(isStraight && flush) { rank = 8; name = "Straight Flush"; }
@@ -152,7 +146,7 @@ function evaluateHand(cards) {
         else if(freqs[0][0] === 2) { rank = 1; name = "Pair"; }
 
         let score = [rank];
-        if (isStraight && sortedVals.join(',') === '2,3,4,5,14') score.push(5,4,3,2,1); // Low Ace
+        if (isStraight && sortedVals.join(',') === '2,3,4,5,14') score.push(5,4,3,2,1); 
         else freqs.forEach(f => { for(let i=0; i<f[0]; i++) score.push(f[1]); });
         
         if (compareScores(score, bestScore) > 0) { bestScore = score; bestName = name; }
@@ -187,28 +181,26 @@ function handleNetworkData(data) {
         document.getElementById('opp-name-display').innerText = oppName;
     }
     else if (data.type === 'DEAL') {
-        myHand = data.hand;
-        communityCards = data.community;
-        secretPot = [];
+        myHand = data.hand; communityCards = data.community; secretPot = [];
     }
     else if (data.type === 'STATE') {
-        gameState = data.state;
-        renderGame();
+        gameState = data.state; renderGame();
     }
     else if (data.type === 'PICS') {
-        secretPot.push(...data.images);
-        renderGame();
+        secretPot.push(...data.images); renderGame();
     }
     else if (data.type === 'ACTION' && myRole === 'host') {
         if (data.action === 'FOLD') {
-            gameState.winner = 'host';
-            gameState.phase = 4;
-            gameState.turn = 'none';
+            gameState.winner = 'host'; gameState.phase = 4; gameState.turn = 'none';
             gameState.actionMsg = `${oppName} Folded. Host wins!`;
             syncState();
+        } else if (data.action === 'READY_NEXT') {
+            // NEW: Joiner is ready for next hand
+            gameState.joinerReadyNext = true;
+            if (gameState.hostReadyNext && gameState.joinerReadyNext) startNewHand();
+            else syncState();
         } else {
-            gameState.joinerBetPhase += data.count;
-            gameState.joinerActed = true;
+            gameState.joinerBetPhase += data.count; gameState.joinerActed = true;
             gameState.actionMsg = data.count === 0 ? `${oppName} Checked/Called.` : `${oppName} Raised ${data.count} pics.`;
             checkPhaseAdvance();
         }
@@ -216,7 +208,17 @@ function handleNetworkData(data) {
 }
 
 // --- 5. PLAYER CONTROLS ---
-document.getElementById('btn-next-hand').addEventListener('click', startNewHand);
+
+// NEW: Mutual Agreement to deal next hand
+document.getElementById('btn-next-hand').addEventListener('click', () => {
+    if (myRole === 'host') {
+        gameState.hostReadyNext = true;
+        if (gameState.hostReadyNext && gameState.joinerReadyNext) startNewHand();
+        else syncState();
+    } else {
+        conn.send({ type: 'ACTION', action: 'READY_NEXT' });
+    }
+});
 
 document.getElementById('btn-submit-action').addEventListener('click', async () => {
     const files = document.getElementById('pic-upload').files;
@@ -233,8 +235,7 @@ document.getElementById('btn-submit-action').addEventListener('click', async () 
     document.getElementById('pic-upload').value = ""; 
 
     if (myRole === 'host') {
-        gameState.hostBetPhase += base64s.length;
-        gameState.hostActed = true;
+        gameState.hostBetPhase += base64s.length; gameState.hostActed = true;
         gameState.actionMsg = base64s.length === 0 ? "Host Checked/Called." : `Host Raised ${base64s.length} pics.`;
         if (base64s.length > 0) conn.send({ type: 'PICS', images: base64s });
         checkPhaseAdvance();
@@ -246,11 +247,8 @@ document.getElementById('btn-submit-action').addEventListener('click', async () 
 
 document.getElementById('btn-fold').addEventListener('click', () => {
     if (myRole === 'host') {
-        gameState.winner = 'joiner';
-        gameState.phase = 4;
-        gameState.turn = 'none';
-        gameState.actionMsg = "Host Folded. Player 2 wins!";
-        syncState();
+        gameState.winner = 'joiner'; gameState.phase = 4; gameState.turn = 'none';
+        gameState.actionMsg = "Host Folded. Player 2 wins!"; syncState();
     } else conn.send({ type: 'ACTION', action: 'FOLD' });
 });
 
@@ -259,8 +257,7 @@ document.getElementById('btn-claim-win').addEventListener('click', () => {
     const revealDiv = document.getElementById('revealed-pot-area');
     revealDiv.innerHTML = "";
     secretPot.forEach(imgData => {
-        const img = document.createElement('img'); img.src = imgData; img.className = 'revealed-pic';
-        revealDiv.appendChild(img);
+        const img = document.createElement('img'); img.src = imgData; img.className = 'revealed-pic'; revealDiv.appendChild(img);
     });
     document.getElementById('btn-claim-win').style.display = 'none';
 });
@@ -274,10 +271,8 @@ function createCardHTML(card, isHidden) {
 function renderGame() {
     document.getElementById('opp-action-text').innerText = gameState.actionMsg;
     
-    // My Cards
     if (myHand.length > 0) document.getElementById('my-hand').innerHTML = myHand.map(c => createCardHTML(c, false)).join('');
     
-    // Opponent Cards (Hidden until showdown)
     const oppHandDiv = document.getElementById('opp-hand');
     if (gameState.phase < 4 || !gameState.revealedHostHand) {
         oppHandDiv.innerHTML = `<div class="card hidden">?</div><div class="card hidden">?</div>`;
@@ -286,33 +281,32 @@ function renderGame() {
         oppHandDiv.innerHTML = oppCards.map(c => createCardHTML(c, false)).join('');
     }
 
-    // Community Cards
     if (communityCards.length > 0) {
         let commHtml = "";
         for (let i = 0; i < 5; i++) {
             let isHidden = true;
-            if (gameState.phase >= 1 && i <= 2) isHidden = false; // Flop
-            if (gameState.phase >= 2 && i === 3) isHidden = false; // Turn
-            if (gameState.phase >= 3 && i === 4) isHidden = false; // River
+            if (gameState.phase >= 1 && i <= 2) isHidden = false; 
+            if (gameState.phase >= 2 && i === 3) isHidden = false; 
+            if (gameState.phase >= 3 && i === 4) isHidden = false; 
             commHtml += createCardHTML(communityCards[i], isHidden);
         }
         document.getElementById('community-cards').innerHTML = commHtml;
     }
 
-    // Pot UI
     document.getElementById('pot-count').innerText = secretPot.length;
     document.getElementById('revealed-pot-area').innerHTML = "";
     let hiddenHtml = "";
     for(let i=0; i<secretPot.length; i++) hiddenHtml += `<div class="hidden-pic">?</div>`;
     document.getElementById('hidden-pot-area').innerHTML = hiddenHtml;
 
-    // Turn Control & Buttons
     const myArea = document.getElementById('my-area'), oppArea = document.getElementById('opponent-area');
     const controls = document.getElementById('controls-container'), btnClaimWin = document.getElementById('btn-claim-win');
-    const hostNextBtn = document.getElementById('host-controls');
+    const nextHandControls = document.getElementById('next-hand-controls');
+    const btnNextHand = document.getElementById('btn-next-hand');
+    const readyStatus = document.getElementById('ready-status');
     
     myArea.classList.remove('active-turn'); oppArea.classList.remove('active-turn');
-    controls.style.display = 'none'; btnClaimWin.style.display = 'none'; hostNextBtn.style.display = 'none';
+    controls.style.display = 'none'; btnClaimWin.style.display = 'none'; nextHandControls.style.display = 'none';
 
     if (gameState.phase < 4) {
         if (gameState.turn === myRole) {
@@ -328,14 +322,26 @@ function renderGame() {
         }
     } else {
         document.getElementById('my-action-text').innerText = "Hand Over.";
-        if (myRole === 'host') hostNextBtn.style.display = 'block'; 
         
+        // Winner Reveal Logic
         if (gameState.winner === myRole) {
             btnClaimWin.style.display = 'block';
             btnClaimWin.innerText = "🏆 I Won! (Reveal Pot)";
         } else if (gameState.winner === 'tie') {
             btnClaimWin.style.display = 'block';
             btnClaimWin.innerText = "🤝 Tie! (Reveal Pot)";
+        }
+
+        // NEW: Dual Ready Logic
+        nextHandControls.style.display = 'block';
+        let amIReady = myRole === 'host' ? gameState.hostReadyNext : gameState.joinerReadyNext;
+        
+        if (amIReady) {
+            btnNextHand.style.display = 'none';
+            readyStatus.style.display = 'block'; // Shows "Waiting for opponent to be ready..."
+        } else {
+            btnNextHand.style.display = 'block';
+            readyStatus.style.display = 'none';
         }
     }
 }

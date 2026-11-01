@@ -2,67 +2,69 @@
 <html lang="en">
 <head>
     <meta charset="UTF-8">
-        <meta name="viewport" content="width=device-width, initial-scale=1.0">
-            <title>Picture Poker</title>
-                <link rel="stylesheet" href="style.css">
-                    <script src="https://unpkg.com/peerjs@1.5.2/dist/peerjs.min.js"></script>
-                    </head>
-                    <body>
-                        <div id="setup-screen">
-                                <h1>🖼️ Auto Picture Poker</h1>
-                                        <div class="panel">
-                                                    <input type="text" id="player-name" placeholder="Enter Your Name" style="font-size: 20px; text-align: center; margin-bottom: 15px;">
-                                                                <br>
-                                                                            <input type="text" id="room-code" placeholder="Enter Secret Room Code" style="text-transform: uppercase; font-size: 20px; text-align: center;">
-                                                                                        <br>
-                                                                                                    <button id="host-btn">1. Create Table (Host)</button>
-                                                                                                                <button id="join-btn">2. Join Table (Player 2)</button>
-                                                                                                                            <p id="status-msg"></p>
-                                                                                                                                    </div>
-                                                                                                                                        </div>
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Picture Poker</title>
+    <link rel="stylesheet" href="style.css">
+    <script src="https://unpkg.com/peerjs@1.5.2/dist/peerjs.min.js"></script>
+</head>
+<body>
+    <div id="setup-screen">
+        <h1>🖼️ Auto Picture Poker</h1>
+        <div class="panel">
+            <input type="text" id="player-name" placeholder="Enter Your Name" style="font-size: 20px; text-align: center; margin-bottom: 15px;">
+            <br>
+            <input type="text" id="room-code" placeholder="Enter Secret Room Code" style="text-transform: uppercase; font-size: 20px; text-align: center;">
+            <br>
+            <button id="host-btn">1. Create Table (Host)</button>
+            <button id="join-btn">2. Join Table (Player 2)</button>
+            <p id="status-msg"></p>
+        </div>
+    </div>
 
-                                                                                                                                            <div id="game-screen" style="display: none;">
-                                                                                                                                                    
-                                                                                                                                                            <div id="opponent-area" class="player-zone">
-                                                                                                                                                                        <h3 id="opp-name-display">Opponent</h3>
-                                                                                                                                                                                    <div id="opp-hand" class="card-container"></div>
-                                                                                                                                                                                                <p id="opp-action-text" class="action-text">Waiting for game to start...</p>
-                                                                                                                                                                                                        </div>
+    <div id="game-screen" style="display: none;">
+        
+        <div id="opponent-area" class="player-zone">
+            <h3 id="opp-name-display">Opponent</h3>
+            <div id="opp-hand" class="card-container"></div>
+            <p id="opp-action-text" class="action-text">Waiting for game to start...</p>
+        </div>
 
-                                                                                                                                                                                                                <div id="table-center">
-                                                                                                                                                                                                                            <h2>Community Cards</h2>
-                                                                                                                                                                                                                                        <div id="community-cards" class="card-container"></div>
+        <div id="table-center">
+            <h2>Community Cards</h2>
+            <div id="community-cards" class="card-container"></div>
 
-                                                                                                                                                                                                                                                    <div id="pot-zone">
-                                                                                                                                                                                                                                                                    <h2>Secret Pot: <span id="pot-count">0</span> Pictures</h2>
-                                                                                                                                                                                                                                                                                    <div id="hidden-pot-area"></div>
-                                                                                                                                                                                                                                                                                                    <div id="revealed-pot-area"></div>
-                                                                                                                                                                                                                                                                                                                </div>
-                                                                                                                                                                                                                                                                                                                            
-                                                                                                                                                                                                                                                                                                                                        <div id="host-controls" style="display: none; margin-top: 15px;">
-                                                                                                                                                                                                                                                                                                                                                        <button id="btn-next-hand" style="background-color: #3498db; width: 100%;">Deal Next Hand</button>
-                                                                                                                                                                                                                                                                                                                                                                    </div>
-                                                                                                                                                                                                                                                                                                                                                                            </div>
+            <div id="pot-zone">
+                <h2>Secret Pot: <span id="pot-count">0</span> Pictures</h2>
+                <div id="hidden-pot-area"></div>
+                <div id="revealed-pot-area"></div>
+            </div>
+            
+            <!-- NEW: Shared Controls for Next Hand -->
+            <div id="next-hand-controls" style="display: none; margin-top: 15px;">
+                <button id="btn-next-hand" style="background-color: #3498db; width: 100%;">Ready for Next Hand</button>
+                <p id="ready-status" style="font-style: italic; font-weight: bold; color: #f1c40f; display: none;">Waiting for opponent to be ready...</p>
+            </div>
+        </div>
 
-                                                                                                                                                                                                                                                                                                                                                                                    <div id="my-area" class="player-zone">
-                                                                                                                                                                                                                                                                                                                                                                                                <p id="my-action-text" class="action-text">Connecting...</p>
-                                                                                                                                                                                                                                                                                                                                                                                                            <div id="my-hand" class="card-container"></div>
-                                                                                                                                                                                                                                                                                                                                                                                                                        <h3 id="my-name-display">Me</h3>
-                                                                                                                                                                                                                                                                                                                                                                                                                                    
-                                                                                                                                                                                                                                                                                                                                                                                                                                                <div id="controls-container" class="controls-container">
-                                                                                                                                                                                                                                                                                                                                                                                                                                                                <p id="call-instruction" style="font-weight:bold; color: #f1c40f; margin-bottom: 5px;"></p>
-                                                                                                                                                                                                                                                                                                                                                                                                                                                                                <div class="betting-controls">
-                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                    <button id="btn-fold" class="action-btn" style="background-color: #e74c3c;">Fold</button>
-                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                        <div style="display: flex; flex-direction: column; flex: 2; gap: 5px;">
-                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                <input type="file" id="pic-upload" accept="image/*" multiple style="width: 100%;">
-                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                        <button id="btn-submit-action" class="action-btn" style="background-color: #27ae60;">Submit (Check/Call/Raise)</button>
-                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                            </div>
-                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                            </div>
-                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                        </div>
+        <div id="my-area" class="player-zone">
+            <p id="my-action-text" class="action-text">Connecting...</p>
+            <div id="my-hand" class="card-container"></div>
+            <h3 id="my-name-display">Me</h3>
+            
+            <div id="controls-container" class="controls-container">
+                <p id="call-instruction" style="font-weight:bold; color: #f1c40f; margin-bottom: 5px;"></p>
+                <div class="betting-controls">
+                    <button id="btn-fold" class="action-btn" style="background-color: #e74c3c;">Fold</button>
+                    <div style="display: flex; flex-direction: column; flex: 2; gap: 5px;">
+                        <input type="file" id="pic-upload" accept="image/*" multiple style="width: 100%;">
+                        <button id="btn-submit-action" class="action-btn" style="background-color: #27ae60;">Submit (Check/Call/Raise)</button>
+                    </div>
+                </div>
+            </div>
 
-                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                    <button id="btn-claim-win" style="display:none; background-color: #9b59b6; width: 100%; margin-top: 15px;">🏆 I Won! (Reveal Pot)</button>
-                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                            </div>
-                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                </div>
-                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                    <script src="script.js"></script>
-                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                    </body>
-                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                    </html>
+            <button id="btn-claim-win" style="display:none; background-color: #9b59b6; width: 100%; margin-top: 15px;">🏆 I Won! (Reveal Pot)</button>
+        </div>
+    </div>
+    <script src="script.js"></script>
+</body>
+</html>
