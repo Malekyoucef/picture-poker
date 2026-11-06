@@ -1,8 +1,6 @@
 let peer, conn;
 let myRole = null; 
 let myName = "Player", oppName = "Opponent";
-
-// NEW: Tracks if the very first hand has started to prevent double-dealing
 let gameStarted = false; 
 
 let gameState = { phase: 0, turn: 'none', hostBetPhase: 0, joinerBetPhase: 0, hostActed: false, joinerActed: false, winner: null, actionMsg: "Game starting...", hostReadyNext: false, joinerReadyNext: false };
@@ -12,9 +10,32 @@ let hostKnownJoinerHand = [];
 
 const suits = ['♥', '♦', '♠', '♣'];
 const values = ['2', '3', '4', '5', '6', '7', '8', '9', '10', 'J', 'Q', 'K', 'A'];
+const ROOM_PREFIX = "picture-poker-v7-";
 
-// Changed prefix to v6 so it connects to a fresh server channel
-const ROOM_PREFIX = "picture-poker-v6-";
+// NEW: Network ICE Servers (This is the bridge that allows international connections!)
+const peerConfig = {
+    config: {
+        iceServers: [
+            { urls: 'stun:stun.l.google.com:19302' },
+            { urls: 'stun:stun1.l.google.com:19302' },
+            {
+                urls: "turn:openrelay.metered.ca:80",
+                username: "openrelayproject",
+                credential: "openrelayproject"
+            },
+            {
+                urls: "turn:openrelay.metered.ca:443",
+                username: "openrelayproject",
+                credential: "openrelayproject"
+            },
+            {
+                urls: "turn:openrelay.metered.ca:443?transport=tcp",
+                username: "openrelayproject",
+                credential: "openrelayproject"
+            }
+        ]
+    }
+};
 
 // --- 1. SETUP ---
 document.getElementById('host-btn').addEventListener('click', () => {
@@ -23,12 +44,13 @@ document.getElementById('host-btn').addEventListener('click', () => {
     if (!code) return alert("Enter Room Code!");
     
     myRole = 'host';
-    peer = new Peer(ROOM_PREFIX + code);
+    // Inject the international connection bridge here
+    peer = new Peer(ROOM_PREFIX + code, peerConfig);
+    
     peer.on('open', () => document.getElementById('status-msg').innerHTML = `Table Created! Friend joins with code <b>${code}</b>...`);
     
     peer.on('connection', (connection) => {
         conn = connection;
-        // FIX: Wait for the connection pipeline to be 100% open before sending data!
         conn.on('open', () => {
             setupUI();
             conn.on('data', handleNetworkData);
@@ -42,8 +64,11 @@ document.getElementById('join-btn').addEventListener('click', () => {
     if (!code) return alert("Enter Room Code!");
     
     myRole = 'joiner';
-    document.getElementById('status-msg').innerText = "Connecting...";
-    peer = new Peer();
+    document.getElementById('status-msg').innerText = "Connecting across the world...";
+    
+    // Inject the international connection bridge here
+    peer = new Peer(peerConfig);
+    
     peer.on('open', () => {
         conn = peer.connect(ROOM_PREFIX + code);
         conn.on('open', () => { 
@@ -58,7 +83,6 @@ function setupUI() {
     document.getElementById('game-screen').style.display = 'block';
     document.getElementById('my-name-display').innerText = myName;
     
-    // When UI is set up, send our name to the other player (The "Hello" Handshake)
     conn.send({ type: 'INFO', name: myName });
 }
 
@@ -193,7 +217,6 @@ function handleNetworkData(data) {
         oppName = data.name;
         document.getElementById('opp-name-display').innerText = oppName;
         
-        // FIX: Start the first hand EXACTLY when Player 2 says "Hello" (sends INFO)
         if (myRole === 'host' && !gameStarted) {
             gameStarted = true;
             startNewHand();
